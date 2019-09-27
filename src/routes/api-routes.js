@@ -1,4 +1,5 @@
 // Dummy data - For testing only
+// TODO: Use a proper database (Postgre) instead of hardcoded JSON
 var id0 = Buffer.from('0')
 var id1 = Buffer.from('1')
 
@@ -15,7 +16,7 @@ var dummy =
     'events':
       [
         {'index': 0, 'data': data00.toString('base64')},
-        {'index': 1, 'data': data01.toString('base64')}
+        {'index': 1, 'data': data01.toString('base64')},
       ]
   },
 
@@ -37,7 +38,7 @@ var dummy =
 // description: Returns length property of a given stream
 // inputs: stream_id:Int
 // returns: Int
-function length(stream_id) {
+async function length(stream_id) {
   var len = -1
   if (stream_id < dummy.length && stream_id >= 0) {
     len = dummy[stream_id].length
@@ -49,25 +50,39 @@ function length(stream_id) {
 // description: Returns an interval of events in a given stream
 // inputs: stream_id:Int, from:Int, to:Int
 // returns: [Object]
-function load(stream_id, from, to) {
-  return [{}]
+async function load(stream_id, from, to) {
+  var result = []
+  if (stream_id < dummy.length && stream_id >= 0) {
+    var events = dummy[stream_id].events;
+    if (events.length > from && events.length <= to) {
+      result = events.slice(from, to)
+    }
+  }
+  return result
 }
 
 
 // function push
 // description: Include an event in a given stream
-// inputs: stream_id:int
-// returns: nothing
-function push(stream_id) {
-
+// inputs: stream_id:Int, data:String
+// returns: Object -- success/failure indicator
+async function push(stream_id, data) {
+  var result = {success: 'false'}
+  if (stream_id < dummy.length && stream_id >= 0) {
+    var len = dummy[stream_id].length
+    dummy[stream_id].events[len] = {'index': len, 'data': data}
+    dummy[stream_id].length += 1;
+    result.success = 'true'
+  }
+  return result
 }
 
 // Routes
 async function routes (fastify, options) {
   // length
   fastify.get('/streams/:stream_id', async (req, res) => {
-    var id = req.params.stream_id
-    const result = await length(0);
+    var stream_id = req.params.stream_id
+    const result = await length(stream_id);
     if (result === -1) {
       throw new Error('stream_id not found')
     }
@@ -75,13 +90,22 @@ async function routes (fastify, options) {
   })
 
   // load
-  fastify.get('/streams/:stream_id/events?from=:from&to=:to', async (req, res) => {
-    return { hello: 'load' }
+  fastify.get('/streams/:stream_id/events/:from/:to', async (req, res) => {
+    var stream_id = req.params.stream_id
+    var from      = req.params.from
+    var to        = req.params.to
+
+    const result  = await load(stream_id, from, to);
+    return JSON.stringify(result);
   })
 
   // push
   fastify.post('/streams/:stream_id/events', async (req, res) => {
-    res.send({ hello: 'push' })
+    var stream_id = req.params.stream_id
+    var data = req.body.data
+
+    var result = push(stream_id, data)
+    return JSON.stringify({})
   })
 }
 
