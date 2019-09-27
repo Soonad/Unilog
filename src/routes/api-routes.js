@@ -7,41 +7,72 @@ var data01 = Buffer.from('TEST_DATA: STREAM 0; EVENT 1')
 var data10 = Buffer.from('TEST_DATA: STREAM 1; EVENT 0')
 
 var dummy =
-{
-  stream1:
-    {
-      id: id0.toString('base64'),
-      length: 2,
-      events: [
-        { index: 0, data: data00.toString('base64') },
-        { index: 1, data: data01.toString('base64') }
+[
+  {
+    'name' : 'stream1',
+    'length': 2,
+    'id': '0'/*id0.toString('base64')*/,
+    'events':
+      [
+        {'index': 0, 'data': data00.toString('base64')},
+        {'index': 1, 'data': data01.toString('base64')}
       ]
-    },
+  },
 
-  stream2:
-    {
-      id: id1.toString('base64'),
-      length: 1,
-      events: [
-        { index: 0, data: data10.toString('base64') }
+  {
+    'name' : 'stream2',
+    'length': 1,
+    'id': '1'/*id1.toString('base64')*/,
+    'events':
+      [
+        {'index': 0, 'data': data10.toString('base64')},
       ]
-    }
+  },
+]
+
+// Data access fucntions
+// TODO: transfer these functions to a separate file
+
+// function length
+// description: Returns length property of a given stream
+// inputs: stream_id:Int
+// returns: Int
+function length(stream_id) {
+  return 0
 }
 
-async function routes (fastify, options) {
-  // push
-  fastify.post('/streams/:stream_id/events', async (req, res) => {
-    return { hello: 'push' }
-  })
+// function load
+// description: Returns an interval of events in a given stream
+// inputs: stream_id:Int, from:Int, to:Int
+// returns: [Object]
+function load(stream_id, from, to) {
+  return [{}]
+}
 
+
+// function push
+// description: Include an event in a given stream
+// inputs: stream_id:int
+// returns: nothing
+function push(stream_id) {
+
+}
+
+// Routes
+async function routes (fastify, options) {
   // length
-  fastify.get('/streams/:stream_id/events', async (req, res) => {
-    return { hello: 'length' }
+  fastify.get('/streams/:stream_id', async (req, res) => {
+    res.send({ hello: 'length' })
   })
 
   // load
   fastify.get('/streams/:stream_id', async (req, res) => {
     return { hello: 'load' }
+  })
+
+  // push
+  fastify.post('/streams/:stream_id/events', async (req, res) => {
+    res.send({ hello: 'push' })
   })
 }
 
