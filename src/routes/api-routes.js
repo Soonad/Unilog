@@ -38,7 +38,11 @@ var dummy =
 // inputs: stream_id:Int
 // returns: Int
 function length(stream_id) {
-  return 0
+  var len = -1
+  if (stream_id < dummy.length && stream_id >= 0) {
+    len = dummy[stream_id].length
+  }
+  return len
 }
 
 // function load
@@ -62,11 +66,16 @@ function push(stream_id) {
 async function routes (fastify, options) {
   // length
   fastify.get('/streams/:stream_id', async (req, res) => {
-    res.send({ hello: 'length' })
+    var id = req.params.stream_id
+    const result = await length(0);
+    if (result === -1) {
+      throw new Error('stream_id not found')
+    }
+    return JSON.stringify(result)
   })
 
   // load
-  fastify.get('/streams/:stream_id', async (req, res) => {
+  fastify.get('/streams/:stream_id/events?from=:from&to=:to', async (req, res) => {
     return { hello: 'load' }
   })
 
