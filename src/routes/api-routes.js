@@ -1,3 +1,5 @@
+const api_base_url = '/api';
+
 // Dummy data - For testing only
 // TODO: Use a proper database (Postgre) instead of hardcoded JSON
 var id0 = Buffer.from('0')
@@ -31,7 +33,7 @@ var dummy =
   }
 ]
 
-// Data access fucntions
+// Data access functions
 // TODO: transfer these functions to a separate file
 
 // function length
@@ -54,8 +56,8 @@ async function load (stream_id, from, to) {
   var result = []
   if (stream_id < dummy.length && stream_id >= 0) {
     var events = dummy[stream_id].events
-    if (events.length > from && events.length <= to) {
-      result = events.slice(from, to)
+    if (from >= 0 && to >= from && from < events.length && to < events.length) {
+      result = events.slice(from, to+1)
     }
   }
   return result
@@ -66,27 +68,32 @@ async function load (stream_id, from, to) {
 // inputs: stream_id:Int, data:String
 // returns: Object -- success/failure indicator
 async function push (stream_id, data) {
-  var result = { success: 'false' }
+  var success = false
   if (stream_id < dummy.length && stream_id >= 0) {
     var len = dummy[stream_id].length
     dummy[stream_id].events[len] = { index: len, data: data }
     dummy[stream_id].length += 1
-    result.success = 'true'
+    success = true
   }
   return result
 }
 
-// Routes URLs
-const length_url = '/streams/:stream_id'
-const load_url = '/streams/:stream_id/events/:from/:to'
-const push_url = '/streams/:stream_id/events'
+// =============== Route URLs =============== //
+const length_url = api_base_url + '/streams/:stream_id'
+const load_url = api_base_url + '/streams/:stream_id/events/:from/:to'
+const push_url = api_base_url + '/streams/:stream_id/events'
 
-// Routes Schemas
+// =============== Route Schemas =============== //
 const length_schema =
 {
   response: {
     200: {
-      type: 'string'
+      type: 'object',
+      properties: {
+        stream: { type: 'string' },
+        length: { type: 'string' },
+        msg:  { type: 'string' },
+      },
     }
   }
 }
@@ -95,48 +102,80 @@ const load_schema =
 {
   response: {
     200: {
-      type: 'string'
-    }
-  }
+      type: 'object',
+      properties: {
+        stream: { type: 'string' },
+        events: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              index: {type: 'integer'},
+              data: {type: 'string'},
+            },
+          },
+        },
+      },
+    },
+  },
 }
 
 const push_schema =
 {
   response: {
     200: {
-      type: 'string'
+      type: 'object',
+      parameters: {
+        success: 'boolean',
+      }
     }
   }
 }
 
-// Routes Handlers
+// =============== Route Handlers =============== //
 async function length_handler (req, res) {
-  var stream_id = req.params.stream_id
-  const result = await length(stream_id)
-  if (result === -1) {
-    throw new Error('stream_id not found')
+  const stream_id = req.params.stream_id
+  const len = await length(stream_id)
+  const error_msg = (len > -1) ? '' : 'stream_id not found';
+
+  const resp =
+  {
+    stream: stream_id,
+    length: len,
+    msg : error_msg,
   }
-  return JSON.stringify(result)
+
+  return JSON.stringify(resp)
 }
 
 async function load_handler (req, res) {
-  var stream_id = req.params.stream_id
-  var from = req.params.from
-  var to = req.params.to
+  const stream_id = req.params.stream_id
+  const from = req.params.from
+  const to = req.params.to
 
-  const result = await load(stream_id, from, to)
-  return JSON.stringify(result)
+  const events_array = await load(stream_id, from, to)
+
+  const resp = {
+    stream: stream_id,
+    events: events_array,
+  }
+
+  return JSON.stringify(resp)
 }
 
 async function push_handler (req, res) {
-  var stream_id = req.params.stream_id
-  var data = req.body.data
+  const stream_id = req.params.stream_id
+  const data = req.body.data
+  const is_successful = push(stream_id, data)
 
-  var result = push(stream_id, data)
-  return JSON.stringify(result)
+  const resp = {
+    success: is_successful,
+  }
+
+  return JSON.stringify(resp)
 }
 
-// Routes
+// =============== Routes =============== //
 const routes = [
   // length
   {
