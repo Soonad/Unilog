@@ -41,7 +41,7 @@ var dummy =
 // inputs: stream_id:Int
 // returns: Int
 async function length (stream_id) {
-  var len = -1
+  var len = null
   if (stream_id < dummy.length && stream_id >= 0) {
     len = dummy[stream_id].length
   }
@@ -75,7 +75,7 @@ async function push (stream_id, data) {
     dummy[stream_id].length += 1
     success = true
   }
-  return result
+  return success
 }
 
 // =============== Route URLs =============== //
@@ -91,7 +91,7 @@ const length_schema =
       type: 'object',
       properties: {
         stream: { type: 'string' },
-        length: { type: 'string' },
+        length: { type: 'integer' },
         msg:  { type: 'string' },
       },
     }
@@ -125,18 +125,26 @@ const push_schema =
   response: {
     200: {
       type: 'object',
-      parameters: {
-        success: 'boolean',
-      }
-    }
-  }
+      properties: {
+        success: {type: 'boolean'},
+        msg: {type: 'string'},
+      },
+    },
+    201: {
+      type: 'object',
+      properties: {
+        success: {type: 'boolean'},
+        msg: {type: 'string'},
+      },
+    },
+  },
 }
 
 // =============== Route Handlers =============== //
 async function length_handler (req, res) {
   const stream_id = req.params.stream_id
   const len = await length(stream_id)
-  const error_msg = (len > -1) ? '' : 'stream_id not found';
+  const error_msg = (len === null) ? 'stream_id not found' : '';
 
   const resp =
   {
@@ -166,13 +174,19 @@ async function load_handler (req, res) {
 async function push_handler (req, res) {
   const stream_id = req.params.stream_id
   const data = req.body.data
-  const is_successful = push(stream_id, data)
+  const is_successful = await push(stream_id, data)
+  var msg = "OK"
+  if (!is_successful) {
+    res.code(201)
+    msg = `An error occured when trying to push data to stream ${stream_id}`
+  }
 
   const resp = {
     success: is_successful,
+    msg: msg
   }
 
-  return JSON.stringify(resp)
+  return resp
 }
 
 // =============== Routes =============== //
