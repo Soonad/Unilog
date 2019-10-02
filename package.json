@@ -4,6 +4,8 @@
   "description": "Simple event log server ",
   "main": "main.js",
   "scripts": {
+    "start": "node ./src/server.js",
+    "docker": "docker build -t moonad/unilog . && docker run -p 3001:3000 -d moonad/unilog",
     "test": "mocha"
   },
   "repository": {
