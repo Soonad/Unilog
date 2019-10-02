@@ -1,13 +1,120 @@
 const chai = require('chai')
 const chaiHttp = require('chai-http')
 const app = require('../src/server')
+const utils = require('../src/utils/utils')
+const im = require('../src/event_storage/in-memory')
 
 const url = ('http://localhost:3000/api')
 const should = chai.should()
 const expect = chai.expect
 chai.use(chaiHttp)
 
-describe('Unilog Server', () => {
+describe('Unilog Tests', () => {
+  // =============== Utils Tests =============== //
+  describe('base64_url_encode: input with padding', () => {
+    it('should return correct URL base64 encoding', () => {
+      const original = 'testInput1' // base64 is dGVzdElucHV0MQ==
+      const encoded = utils.base64_url_encode(Buffer.from(original))
+      expect(encoded === 'dGVzdElucHV0MQ').to.be.true
+    })
+  })
+
+  describe('base64_url_decode: input with padding', () => {
+    it('should return correct string from URL base64', () => {
+      const original = 'dGVzdElucHV0MQ'
+      const decoded = utils.base64_url_decode(original) // base64 would be dGVzdElucHV0MQ==
+      expect(decoded.toString('ascii') === 'testInput1').to.be.true
+    })
+  })
+
+
+  describe('isBase64: ascii input', () => {
+    it('should return true', () => {
+      const original = 'test'
+      const encoded = utils.base64_url_encode(Buffer.from(original))
+      expect(utils.isBase64(encoded)).to.be.true
+    })
+  })
+
+  describe('isBase64: non-ascii input', () => {
+    it('should return true', () => {
+      const original = 'téçt'
+      const encoded = utils.base64_url_encode(Buffer.from(original)) // URL safe
+      expect(utils.isBase64(encoded)).to.be.true
+    })
+  })
+
+  describe('isSizeValid: size < max_size', () => {
+    it('should return true', () => {
+      const original = 'test'
+      const encoded = utils.base64_url_encode(Buffer.from(original)) // URL safe
+      expect(utils.isSizeValid(encoded, 8)).to.be.true
+    })
+  })
+
+  describe('isSizeValid: size = max_size', () => {
+    it('should return true', () => {
+      const original = 'test'
+      const encoded = utils.base64_url_encode(Buffer.from(original)) // URL safe
+      expect(utils.isSizeValid(encoded, 4)).to.be.true
+    })
+  })
+
+  describe('isSizeValid: size > max_size', () => {
+    it('should return false', () => {
+      const original = 'test'
+      const encoded = utils.base64_url_encode(Buffer.from(original)) // URL safe
+      expect(utils.isSizeValid(encoded, 3)).to.be.false
+    })
+  })
+
+  // =============== In Memory Storage Tests =============== //
+  describe('In Memory length: existing stream_id', () => {
+    it('should return 2', async () => {
+      expect(await im.length('MQ')).to.equal(2)
+    })
+  })
+
+  describe('In Memory length: non-existing stream_id', () => {
+    it('should return 0', async () => {
+      expect(await im.length('non-existing')).to.equal(0)
+    })
+  })
+
+  describe('In Memory load: existing stream_id', () => {
+    it('should return 2 events', async () => {
+      expect((await im.load('MQ', 0, 1)).length).to.equal(2)
+    })
+  })
+
+  describe('In Memory load: non-existing stream_id', () => {
+    it('should return 0 events', async () => {
+      expect(await im.load('non-existing', 0, 1)).to.be.empty
+    })
+  })
+
+  describe('In Memory load: \"to\" out of bounds', () => {
+    it('should return 0 events', async () => {
+      console.log("\n\n" + JSON.stringify(await im.load('MQ', 0, 999)) + "\n\n")
+      expect((await im.load('MQ', 0, 999))).to.be.empty
+    })
+  })
+
+  describe('In Memory load: \"from\" & \"to\" out of bounds', () => {
+    it('should return 0 events', async () => {
+      expect(await im.load('MQ', 900, 999)).to.be.empty
+    })
+  })
+
+  describe('In Memory push', async () => {
+    it('should include new stream and event', async () => {
+      expect(await im.length('Mw')).to.equal(0)
+      expect(await im.load('Mw', 0, 0)).to.be.empty
+      await im.push('Mw', 'test data')
+      expect(await im.length('Mw')).to.equal(1)
+      expect(((await im.load('Mw', 0, 0))[0].data)).to.equal('test data')
+    })
+  })
 
   // =============== length(stream_id) Tests =============== //
   describe('GET get_stream: valid stream_id', () => {
@@ -17,6 +124,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(200)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           expect(resp.length >= 0).to.be.true
@@ -32,6 +140,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(400)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           resp.error.should.not.be.empty
@@ -48,6 +157,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(400)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           resp.error.should.not.be.empty
@@ -65,6 +175,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(200)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           expect(resp.events.length === 2).to.be.true
@@ -82,6 +193,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(200)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           expect(resp.events.length === 1).to.be.true
@@ -97,6 +209,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(200)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           expect(resp.events).to.be.empty
@@ -112,6 +225,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(200)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           expect(resp.events).to.be.empty
@@ -127,6 +241,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(400)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           resp.error.should.not.be.empty
@@ -143,6 +258,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(400)
           res.body.should.be.an('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           resp.error.should.not.be.empty
@@ -163,6 +279,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(200)
           res.body.should.be.a('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
           done()
         })
     })
@@ -178,6 +295,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(400)
           res.body.should.be.a('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           resp.error.should.not.be.empty
@@ -197,6 +315,7 @@ describe('Unilog Server', () => {
         .end((err, res) => {
           res.should.have.status(400)
           res.body.should.be.a('object')
+          expect(res.header["content-type"] == 'application/json; charset=utf-8').to.be.true
 
           const resp = JSON.parse(res.text)
           resp.error.should.not.be.empty
