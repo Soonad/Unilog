@@ -1,11 +1,20 @@
-const app = require('fastify')({ logger: true })
+const fastify = require('fastify')({ logger: true })
+const routes = require('./routes/api-routes')
+const swagger = require('./config/swagger')
 
-app.register(require('./routes/test-route'))
+fastify.register(require('fastify-swagger'), swagger.options)
+routes.forEach((route, index) => {
+  fastify.route(route)
+})
 
-module.exports = app.listen(3000, function (err, addr) {
-  if (err) {
-    app.log.error(err)
+const start = async () => {
+  try {
+    await fastify.listen(3000, '0.0.0.0')
+    fastify.swagger()
+    fastify.log.info(`server listening on ${fastify.server.address().port}`)
+  } catch (err) {
+    fastify.log.error(err)
     process.exit(1)
   }
-  app.log.info(`server listening on ${addr}`)
-})
+}
+start()
