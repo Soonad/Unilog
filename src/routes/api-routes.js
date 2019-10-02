@@ -1,107 +1,18 @@
-const api_base_url = '/api';
+const utils = require('../utils/utils')
+const isSizeValid = utils.isSizeValid
+const isBase64 = utils.isBase64
 
-// Dummy data - For testing only
-// TODO: Use a proper database (Postgre) instead of hardcoded JSON
+const in_memory = require('../event_storage/in-memory')
+const dummy = in_memory.dummy
+const length = in_memory.length
+const load = in_memory.load
+const push = in_memory.push
+
+const api_base_url = '/api';
 
 // max size in bytes
 const stream_id_max_size = 16
 const data_max_size = 128
-
-var id0 = Buffer.from('0')
-var id1 = Buffer.from('1')
-
-var data00 = Buffer.from('TEST_DATA: STREAM 0; EVENT 0')
-var data01 = Buffer.from('TEST_DATA: STREAM 0; EVENT 1')
-var data10 = Buffer.from('TEST_DATA: STREAM 1; EVENT 0')
-
-var dummy =
-{
-  MQ: {
-    length: 2,
-    events:
-      [
-        { index: 0, data: data00.toString('base64') },
-        { index: 1, data: data01.toString('base64') }
-      ]
-  },
-
-  Mg: {
-    length: 1,
-    events:
-      [
-        { index: 0, data: data10.toString('base64') }
-      ]
-  }
-}
-
-// Data access functions
-// TODO: transfer these functions to a separate file
-
-// function length
-// description: Returns length property of a given stream
-// inputs: stream_id:Int
-// returns: Int
-async function length (stream_id) {
-  var len = 0
-  if (dummy[stream_id] !== undefined) {
-    len = dummy[stream_id].length
-  }
-  return len
-}
-
-// function load
-// description: Returns an interval of events in a given stream
-// inputs: stream_id:Int, from:Int, to:Int
-// returns: [Object]
-async function load (stream_id, from, to) {
-  var result = []
-  if (dummy[stream_id] !== undefined) {
-    var events = dummy[stream_id].events
-    if (from >= 0 && to >= from && from < events.length && to < events.length) {
-      result = events.slice(from, to+1)
-    }
-  }
-  return result
-}
-
-// function push
-// description: Include an event in a given stream
-// inputs: stream_id:Int, data:String
-// returns: Object -- success/failure indicator
-async function push (stream_id, data) {
-  var success = false
-  const base64_data = data.toString('base64')
-  if (dummy[stream_id] === undefined) {
-    dummy[stream_id] = {
-      length: 1,
-      events:
-        [{ index: 0, data: base64_data }]
-    }
-  } else {
-    var len = dummy[stream_id].length
-    dummy[stream_id].events[len] = { index: len, data: base64_data }
-    dummy[stream_id].length += 1
-    success = true
-  }
-  return success
-}
-
-// Checks if base64 string is well formed
-function isBase64(base64_str) {
-    if (base64_str === '' || base64_str.trim() === ''){ return false; }
-    try {
-      const str_decode = Buffer.from(base64_str, 'base64').toString('ascii')
-      const str_reencode = Buffer.from(str_decode).toString('base64').replace(/=/g, '')
-      return str_reencode == base64_str
-    } catch (err) {
-        return false;
-    }
-}
-
-// checks if input size is valid
-function isSizeValid(base64_str, max_size) {
-  return Buffer.from(base64_str, 'base64').toString('ascii').length <= max_size
-}
 
 // =============== Route URLs =============== //
 const get_stream_url = api_base_url + '/streams/:stream_id'
@@ -194,7 +105,10 @@ async function get_stream_handler (req, res) {
       length: len,
     }
 
-    return JSON.stringify(resp)
+    res
+    .code(200)
+    .header('Content-Type', 'application/json; charset=utf-8')
+    .send(resp)
   }
 
   res
@@ -222,7 +136,10 @@ async function get_stream_events_handler (req, res) {
       events: events_array,
     }
 
-    return JSON.stringify(resp)
+    res
+    .code(200)
+    .header('Content-Type', 'application/json; charset=utf-8')
+    .send(resp)
   }
 
   res
@@ -259,6 +176,7 @@ async function push_event_handler (req, res) {
   if (is_successful) {
     res
     .code(200)
+    .header('Content-Type', 'application/json; charset=utf-8')
     .send({})
   }
   else {
